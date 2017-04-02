@@ -35,13 +35,24 @@ public:
 	 * This function is to start the time counting.
 	 */
 	void start() noexcept;
+	
+	/**
+	 * This function is to start the time counting.
+	 */
+	void restart() noexcept;
 
 	/**
 	 * This function returns a bool to state whether the
 	 * time interval of this watch is ended.
-	 * If it is not, then it will return a false.
+	 * If it is not, then it will return a true.
 	 */
-	bool wait();
+	bool wait() noexcept;
+
+	/**
+	 * This function returns remaining time since the time calling 
+	 * function start().
+	 */
+	Duration remaining() noexcept;
 
 	/**
 	 * Return current timestamp since epoch time.
@@ -63,7 +74,7 @@ private:
 template <typename Duration>
 template <class Rep, class Period>
 MlTimer<Duration>::MlTimer(const std::chrono::duration<Rep, Period>& duration)
-	: threshold(std::chrono::duration_cast<Duration>(duration))  { }
+	: threshold(std::chrono::duration_cast<Duration>(duration)), begin(std::chrono::steady_clock::now())  { }
 
 template <typename Duration>
 MlTimer<Duration>::MlTimer(const Duration& duration)
@@ -76,10 +87,23 @@ void MlTimer<Duration>::start() noexcept
 }
 
 template <typename Duration>
-bool MlTimer<Duration>::wait()
+void MlTimer<Duration>::restart() noexcept
+{
+	start();
+}
+
+template <typename Duration>
+bool MlTimer<Duration>::wait() noexcept
 {
 	using namespace std::chrono;
 	return duration_cast<Duration>(steady_clock::now() - begin).count() < threshold.count();
+}
+
+template <typename Duration>
+Duration MlTimer<Duration>::remaining() noexcept
+{
+	using namespace std::chrono;
+	return threshold - duration_cast<Duration>(steady_clock::now() - begin);
 }
 
 template <typename Duration>

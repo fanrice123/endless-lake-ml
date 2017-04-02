@@ -9,22 +9,21 @@
 
 // MlInputListener Implementation
 MlInputListener::MlInputListener(MlDisplay& display, const std::chrono::milliseconds& ms)
-	: display(display), timer(ms) {}
+	: display(display), timer(ms), clicked(false), pressed(false) {}
 
-MlInputListener::~MlInputListener() { }
-
-void MlInputListener::set_wait_for(const std::chrono::milliseconds& ms)
+bool MlInputListener::has_got_click() const noexcept
 {
-	timer = MlTimer<std::chrono::milliseconds>(ms);
+	return clicked;
 }
 
-// MlMouseListener Implementation
-MlMouseListener::MlMouseListener(MlDisplay& display, const std::chrono::milliseconds& ms)
-	: MlInputListener(display, ms) {}
-
-bool MlMouseListener::get_press(const int mouse_click)
+bool MlInputListener::has_got_press() const noexcept
 {
-	bool ret_val = false;
+	return pressed;
+}
+
+bool MlInputListener::get_click(const MouseClick mouse_click)
+{
+	clicked = false;
 	XEvent xevent;
 
 	grab_pointer();
@@ -33,39 +32,67 @@ bool MlMouseListener::get_press(const int mouse_click)
 		if (xevent.type == ButtonPress) {
 			if (xevent.xbutton.button == mouse_click) {
 				prev_pos = std::make_tuple(xevent.xmotion.x_root, xevent.xmotion.y_root);
-				std::cout << "Mouse clicked " << button[mouse_click] << ": <" << std::get<Coord::X>(prev_pos)
+				std::cout << "Mouse clicked " << mouse_button[mouse_click] << ": <" << std::get<Coord::X>(prev_pos)
 				   << ", "
 				   << std::get<Coord::Y>(prev_pos)
 		 	 	   << ">"
 				   << std::endl;
+				clicked = true;
 				break;
 			} else {
-				std::cout << "Mouse Clicked. Waiting " << button[mouse_click] << " but received " << button[xevent.xbutton.button] << std::endl;
-				ret_val = true;
-				break;
+				std::cout << "Mouse Clicked. Waiting " << mouse_button[mouse_click] << " but received " << mouse_button[xevent.xbutton.button] << std::endl;
 			}
 		}
 	}
 	ungrab_pointer();
 
-	return ret_val;
+	return clicked;
 }
 
-bool MlMouseListener::wait_press(const int mouse_click) 
+bool MlInputListener::get_press(const char key)
 {
-	bool ret_val = false;
+	pressed = false;
+	auto character = std::string(1, static_cast<char>(key));
+	XEvent xevent;
+
+	grab_keyboard();
+	while (true) {
+		XNextEvent(display.display_ptr.get(), &xevent);
+
+      		if (xevent.type == KeyPress) {
+        		unsigned kc = ((XKeyPressedEvent*)&xevent)->keycode;
+			const char* s = XKeysymToString(XkbKeycodeToKeysym(display.display_ptr.get(), kc, 0, 0));
+ 
+			if(strlen(s) && character == s) {
+
+				std::cout << "Keyboard pressed : key \'" << character << "\'" << std::endl;
+				pressed = true;
+				break;
+			} else {
+				std::cout << "Keyboard pressed. Waiting " << character << " but received " << s << std::endl;
+			}
+		}
+	}
+	ungrab_keyboard();
+	return pressed;
+}
+
+bool MlInputListener::wait_click(const MouseClick mouse_click) 
+{
+	clicked = false;
 	XEvent xevent;
 
 	grab_pointer();
 	timer.start();
 	
 	while (timer.wait()) {
-		XNextEvent(display.display_ptr.get(), &xevent);
+		while (XPending(display.display_ptr.get()))
+			XNextEvent(display.display_ptr.get(), &xevent);
 		if (xevent.type == ButtonPress) {
 			if (xevent.xbutton.button == mouse_click) {
-				ret_val = true;
+				clicked = true;
 				prev_pos = std::make_tuple(xevent.xmotion.x_root, xevent.xmotion.y_root);
-				std::cout << "Mouse clicked " << button[mouse_click] << ": <" << xevent.xmotion.x_root
+				std::cout << "Mouse clicked " << mouse_button[mouse_click] << ": <" << xevent.xmotion.x_root
 					  << ", "
 					  << xevent.xmotion.y_root
 					  << ">"
@@ -87,16 +114,113 @@ bool MlMouseListener::wait_press(const int mouse_click)
 			}
 		}
 	}
+	ungrab_pointer();
+	if (!clicked) {
+		prev_pos = std::make_tuple(-1, -1);
+	}
 
-	return ret_val;
+	return clicked;
 }
 
-Position MlMouseListener::get_wait()
+bool MlInputListener::wait_press(const char key)
+{
+	pressed = false;
+	auto character = std::string(static_cast<char>(key), 1);
+	XEvent xevent;
+
+	grab_keyboard();
+	timer.start();
+	
+	while (timer.wait()) {
+		if (!pressed) {
+			while (XPending(display.display_ptr.get()))
+				XNextEvent(display.display_ptr.get(), &xevent);
+      			if (xevent.type == KeyPress) {
+        			unsigned kc = ((XKeyPressedEvent*)&xevent)->keycode;
+				const char* s = XKeysymToString(XkbKeycodeToKeysym(display.display_ptr.get(), kc, 0, 0));
+ 
+				if(strlen(s) && character == s) {
+					pressed = true;
+					std::cout << "Keyboard pressed : key \'" << character << "\'" << std::endl;
+				}
+			}
+		}
+	}
+	ungrab_keyboard();
+
+	return pressed;
+}
+
+void MlInputListener::set_wait_for(const std::chrono::milliseconds& ms)
+{
+	timer = decltype(timer)(ms);
+}
+
+Position MlInputListener::get_prev_position()
 {
 	return prev_pos;
 }
 
-void MlMouseListener::grab_pointer() const
+void MlInputListener::listen_for(const std::chrono::milliseconds& ms, MouseClick click, const char key)
+{
+	pressed = clicked = false;
+	if (ms < std::chrono::milliseconds(0))
+		return;
+	MlTimer<std::chrono::milliseconds> watch(ms);
+	auto character = std::string(1, static_cast<char>(key));
+	XEvent event, fake_event;
+	unsigned kc;
+	const char* s;
+
+	watch.start();
+	grab_keyboard();
+	grab_pointer();
+	while (watch.wait()) {
+		if ((!pressed || !clicked)) {
+			if (XPending(display.display_ptr.get())) {
+				XNextEvent(display.display_ptr.get(), &event);
+				switch (event.type) {
+				case KeyPress:
+					kc = ((XKeyPressedEvent*)&event)->keycode;
+					s = XKeysymToString(XkbKeycodeToKeysym(display.display_ptr.get(), kc, 0, 0));
+					if(strlen(s) && character == s) {
+						pressed = true;
+						std::cout << "Keyboard pressed : key \'" << character << "\'" << std::endl;
+					}
+					break;
+				case ButtonPress:
+					if (event.xbutton.button == click) {
+						clicked = true;
+						prev_pos = std::make_tuple(event.xmotion.x_root, event.xmotion.y_root);
+						std::cout << "Mouse clicked " << mouse_button[click] << ": <" << event.xmotion.x_root
+					  	  	  << ", "
+					  	  	  << event.xmotion.y_root
+					  	  	  << ">"
+					  	  	  << std::endl;
+						ungrab_pointer();
+						memset(&fake_event, 0x00, sizeof(event));
+
+						fake_event.type = ButtonPress;
+						fake_event.xbutton.button = click;
+						fake_event.xbutton.same_screen = True;
+
+						XQueryPointer(display.display_ptr.get(), RootWindow(display.display_ptr.get(), DefaultScreen(display.display_ptr.get())), &fake_event.xbutton.root, &fake_event.xbutton.window, &fake_event.xbutton.x_root, &fake_event.xbutton.y_root, &fake_event.xbutton.x, &fake_event.xbutton.y, &fake_event.xbutton.state);
+
+						if(XSendEvent(display.display_ptr.get(), PointerWindow, True, 0xff, &fake_event) == 0) 
+							std::cout << "Failed sending signal" << std::endl;
+						XFlush(display.display_ptr.get());
+						grab_pointer();
+						break;
+					}
+				}
+			}
+		}
+	}
+	ungrab_keyboard();
+	ungrab_pointer();
+}
+
+void MlInputListener::grab_pointer() const
 {
 	// Calling this function will block all of the other app to listen mouse event.
 	// Hence, don't forget to 'ungrab' it once you are done.
@@ -112,80 +236,14 @@ void MlMouseListener::grab_pointer() const
 	std::cout << "Pointer grabbed.\n";
 }
 
-void MlMouseListener::ungrab_pointer() const
+void MlInputListener::ungrab_pointer() const
 {
 	// forgetting ungrab pointer will block all of the mouse event
 	XUngrabPointer(display.display_ptr.get(), CurrentTime);
 	std::cout << "Pointer ungrabbed.\n";
 }
 
-const char *MlMouseListener::button[4] = {"Undefined button",
-			   "Button Left",
-			   "Button Middle",
-			   "Button Right"};
-
-// MlKeyboardListener Implementation
-MlKeyboardListener::MlKeyboardListener(MlDisplay& display, const std::chrono::milliseconds& ms)
-	: MlInputListener(display, ms) {}
-
-bool MlKeyboardListener::get_press(const int key)
-{
-	bool ret_val = false;
-	auto character = std::string(static_cast<char>(key), 1);
-	XEvent xevent;
-
-	grab_keyboard();
-	while (true) {
-		XNextEvent(display.display_ptr.get(), &xevent);
-
-      		if (xevent.type == KeyPress) {
-        		unsigned kc = ((XKeyPressedEvent*)&xevent)->keycode;
-			const char* s = XKeysymToString(XkbKeycodeToKeysym(display.display_ptr.get(), kc, 0, 0));
- 
-			if(strlen(s) && character == s) {
-
-				std::cout << "Keyboard pressed : key \'" << character << "\'" << std::endl;
-				break;
-			} else {
-				ret_val = true;
-				std::cout << "Keyboard pressed. Waiting " << character << " but received " << s << std::endl;
-			}
-		}
-	}
-	ungrab_keyboard();
-
-	return ret_val;
-}
-
-bool MlKeyboardListener::wait_press(const int key)
-{
-	bool ret_val = false;
-	auto character = std::string(static_cast<char>(key), 1);
-	bool got = false;
-	XEvent xevent;
-
-	grab_keyboard();
-	timer.start();
-	
-	while (timer.wait()) {
-		if (!got) {
-			XNextEvent(display.display_ptr.get(), &xevent);
- 
-      			if (xevent.type == KeyPress) {
-        			unsigned kc = ((XKeyPressedEvent*)&xevent)->keycode;
-				const char* s = XKeysymToString(XkbKeycodeToKeysym(display.display_ptr.get(), kc, 0, 0));
- 
-				if(strlen(s) && character == s) {
-					ret_val = got = true;
-				}
-			}
-		}
-	}
-
-	return ret_val;
-}
-
-void MlKeyboardListener::grab_keyboard() const
+void MlInputListener::grab_keyboard() const
 {
 	XGrabKeyboard(display.display_ptr.get(), 
 			display.window,
@@ -196,10 +254,16 @@ void MlKeyboardListener::grab_keyboard() const
 	std::cout << "Keyboard grabbed.\n";
 }
 
-void MlKeyboardListener::ungrab_keyboard() const
+void MlInputListener::ungrab_keyboard() const
 {
 	// forgetting ungrab pointer will block all of the mouse event
 	XUngrabKeyboard(display.display_ptr.get(), CurrentTime);
 	std::cout << "Keyboard ungrabbed.\n";
 }
+
+const char *MlInputListener::mouse_button[4] = {"Undefined button",
+			   "Button Left",
+			   "Button Middle",
+			   "Button Right"};
+
 

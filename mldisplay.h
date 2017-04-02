@@ -22,8 +22,7 @@ public:
  */
 class MlDisplay {
 friend class MlScreenCapturer;
-friend class MlMouseListener;
-friend class MlKeyboardListener;
+friend class MlInputListener;
 
 public:
 	// constructor
