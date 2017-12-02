@@ -1,5 +1,6 @@
 #ifndef MLDISPLAY_H
 #define MLDISPLAY_H
+#include <opencv2/opencv.hpp>
 #include <stdexcept>
 #include <memory>
 #include <X11/Xlib.h>

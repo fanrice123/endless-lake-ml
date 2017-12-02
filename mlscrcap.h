@@ -1,6 +1,6 @@
 #ifndef MLSCRCAP_H
 #define MLSCRCAP_H
-#include <X11/Xlib.h>
+#include <opencv2/opencv.hpp>
 #include <stdexcept>
 #include "position.h"
 #include "mldisplay.h"
@@ -11,7 +11,7 @@ class MlScreenCapturer;
  * This is a Struct to coordinates of 2 positions that User has clicked,
  * returned by MlScreen::capture_screen_size();
  */
-struct ScreenshotArea
+struct ScreenArea
 {
 	Position positions[2];
 };
@@ -53,14 +53,14 @@ public:
 	/**
 	 * This function can return the area of screenshot going to be captured.
 	 */
-	ScreenshotArea get_screen_coordinate() const;
+	ScreenArea get_screen_coordinate() const;
 
 	/**
 	 * This function is called to operate a screenshot.
 	 * Before calling this function, function capture_screen_size(C1&&, C2&&)
 	 * has to be called otherwise it will capture a fullscreen screenshot.
 	 */
-	void screenshot();
+    cv::Mat screenshot();
 
 	// public member variable
 	

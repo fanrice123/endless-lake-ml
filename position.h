@@ -1,9 +1,9 @@
 #ifndef POSITION_H
 #define POSITION_H
-#include <tuple>
 
-enum Coord {X, Y};
-
-typedef std::tuple<int, int> Position;
+struct Position {
+    int x;
+    int y;
+};
 
 #endif // POSITION_H

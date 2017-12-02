@@ -5,11 +5,27 @@
 #include <iostream>
 #include <tuple>
 #include <cstring>
+#include <cerrno>
+#include <fcntl.h>
+#include <unistd.h>
 #include "mldisplay.h"
+#define MS_LEFT(X) ((X) & 0x1)
+#define MS_RIGHT(X) (((X) & 0x2) >> 1)
+#define MS_MIDDLE(X) (((X) & 0x4) >> 2)
 
 // MlInputListener Implementation
 MlInputListener::MlInputListener(MlDisplay& display, const std::chrono::milliseconds& ms)
-	: display(display), timer(ms), clicked(false), pressed(false) {}
+	: display(display), 
+      timer(ms), 
+      clicked(false), 
+      global_clicked(false), 
+      pressed(false),
+      mice_fd(open("/dev/input/mice", O_RDONLY | O_NONBLOCK))
+{
+    if (mice_fd < 0)
+        throw new std::runtime_error("Open \"/dev/input/mice\" failed.");
+
+}
 
 bool MlInputListener::has_got_click() const noexcept
 {
@@ -31,10 +47,10 @@ bool MlInputListener::get_click(const MouseClick mouse_click)
 		XNextEvent(display.display_ptr.get(), &xevent);
 		if (xevent.type == ButtonPress) {
 			if (xevent.xbutton.button == mouse_click) {
-				prev_pos = std::make_tuple(xevent.xmotion.x_root, xevent.xmotion.y_root);
-				std::cout << "Mouse clicked " << mouse_button[mouse_click] << ": <" << std::get<Coord::X>(prev_pos)
+				prev_pos = { xevent.xmotion.x_root, xevent.xmotion.y_root };
+				std::cout << "Mouse clicked " << mouse_button[mouse_click] << ": <" << prev_pos.x
 				   << ", "
-				   << std::get<Coord::Y>(prev_pos)
+				   << prev_pos.y
 		 	 	   << ">"
 				   << std::endl;
 				clicked = true;
@@ -77,6 +93,43 @@ bool MlInputListener::get_press(const char key)
 	return pressed;
 }
 
+bool MlInputListener::global_wait_click(const MouseClick mouse_click, const std::chrono::milliseconds& ms)
+{
+
+    MlTimer<std::chrono::milliseconds> watch(ms);
+
+    uint8_t data[3];
+
+    global_clicked = false;
+
+    watch.start();
+    while (watch.wait()) {
+        int count;
+        if (!global_clicked) {
+            count = read(mice_fd, data, sizeof(data));
+            if (count >= 0) {
+
+                switch (mouse_click) {
+                case LEFT_CLICK:
+                    global_clicked = MS_LEFT(data[0]);
+                    break;
+                case MIDDLE_CLICK:
+                    global_clicked = MS_MIDDLE(data[0]);
+                    break;
+                case RIGHT_CLICK:
+                    global_clicked = MS_RIGHT(data[0]);
+                    break;
+                }
+            //} else if (count < 0 && errno == EAGAIN) {
+
+            }
+        }
+    }
+
+    return global_clicked;
+}
+    
+
 bool MlInputListener::wait_click(const MouseClick mouse_click) 
 {
 	clicked = false;
@@ -91,32 +144,18 @@ bool MlInputListener::wait_click(const MouseClick mouse_click)
 		if (xevent.type == ButtonPress) {
 			if (xevent.xbutton.button == mouse_click) {
 				clicked = true;
-				prev_pos = std::make_tuple(xevent.xmotion.x_root, xevent.xmotion.y_root);
+				prev_pos = { xevent.xmotion.x_root, xevent.xmotion.y_root };
 				std::cout << "Mouse clicked " << mouse_button[mouse_click] << ": <" << xevent.xmotion.x_root
 					  << ", "
 					  << xevent.xmotion.y_root
 					  << ">"
 					  << std::endl;
-				ungrab_pointer();
-				XEvent event;
-				memset(&event, 0x00, sizeof(event));
-
-				event.type = ButtonPress;
-				event.xbutton.button = mouse_click;
-				event.xbutton.same_screen = True;
-
-				XQueryPointer(display.display_ptr.get(), RootWindow(display.display_ptr.get(), DefaultScreen(display.display_ptr.get())), &event.xbutton.root, &event.xbutton.window, &event.xbutton.x_root, &event.xbutton.y_root, &event.xbutton.x, &event.xbutton.y, &event.xbutton.state);
-
-				if(XSendEvent(display.display_ptr.get(), PointerWindow, True, 0xff, &event) == 0) 
-					std::cout << "Failed sending signal" << std::endl;
-				XFlush(display.display_ptr.get());
-				grab_pointer();
 			}
 		}
 	}
 	ungrab_pointer();
 	if (!clicked) {
-		prev_pos = std::make_tuple(-1, -1);
+		prev_pos = { -1, -1 };
 	}
 
 	return clicked;
@@ -159,65 +198,6 @@ void MlInputListener::set_wait_for(const std::chrono::milliseconds& ms)
 Position MlInputListener::get_prev_position()
 {
 	return prev_pos;
-}
-
-void MlInputListener::listen_for(const std::chrono::milliseconds& ms, MouseClick click, const char key)
-{
-	pressed = clicked = false;
-	if (ms < std::chrono::milliseconds(0))
-		return;
-	MlTimer<std::chrono::milliseconds> watch(ms);
-	auto character = std::string(1, static_cast<char>(key));
-	XEvent event, fake_event;
-	unsigned kc;
-	const char* s;
-
-	watch.start();
-	grab_keyboard();
-	grab_pointer();
-	while (watch.wait()) {
-		if ((!pressed || !clicked)) {
-			if (XPending(display.display_ptr.get())) {
-				XNextEvent(display.display_ptr.get(), &event);
-				switch (event.type) {
-				case KeyPress:
-					kc = ((XKeyPressedEvent*)&event)->keycode;
-					s = XKeysymToString(XkbKeycodeToKeysym(display.display_ptr.get(), kc, 0, 0));
-					if(strlen(s) && character == s) {
-						pressed = true;
-						std::cout << "Keyboard pressed : key \'" << character << "\'" << std::endl;
-					}
-					break;
-				case ButtonPress:
-					if (event.xbutton.button == click) {
-						clicked = true;
-						prev_pos = std::make_tuple(event.xmotion.x_root, event.xmotion.y_root);
-						std::cout << "Mouse clicked " << mouse_button[click] << ": <" << event.xmotion.x_root
-					  	  	  << ", "
-					  	  	  << event.xmotion.y_root
-					  	  	  << ">"
-					  	  	  << std::endl;
-						ungrab_pointer();
-						memset(&fake_event, 0x00, sizeof(event));
-
-						fake_event.type = ButtonPress;
-						fake_event.xbutton.button = click;
-						fake_event.xbutton.same_screen = True;
-
-						XQueryPointer(display.display_ptr.get(), RootWindow(display.display_ptr.get(), DefaultScreen(display.display_ptr.get())), &fake_event.xbutton.root, &fake_event.xbutton.window, &fake_event.xbutton.x_root, &fake_event.xbutton.y_root, &fake_event.xbutton.x, &fake_event.xbutton.y, &fake_event.xbutton.state);
-
-						if(XSendEvent(display.display_ptr.get(), PointerWindow, True, 0xff, &fake_event) == 0) 
-							std::cout << "Failed sending signal" << std::endl;
-						XFlush(display.display_ptr.get());
-						grab_pointer();
-						break;
-					}
-				}
-			}
-		}
-	}
-	ungrab_keyboard();
-	ungrab_pointer();
 }
 
 void MlInputListener::grab_pointer() const

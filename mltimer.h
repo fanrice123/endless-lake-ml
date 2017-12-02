@@ -2,6 +2,7 @@
 #define MLTIMER_H
 #include <chrono>
 #include <cstdint>
+#include <time.h>
 
 /**
  * MlTimer is a utility class providing
@@ -118,10 +119,13 @@ template <class Rep, class Period>
 void MlTimer<Duration>::wait_for(const std::chrono::duration<Rep, Period>& duration)
 {
 	using namespace std::chrono;
-	auto b = steady_clock::now();
 
-	while ((steady_clock::now() - b).count() < duration.count())
-		continue;
+    struct timespec req = { 0, duration_cast<nanoseconds>(duration).count() };
+    struct timespec rem;
+
+    int ret_val = nanosleep(&req, &rem);
+    if (ret_val == EINTR)
+        nanosleep(&rem, nullptr);
 }
 
 #endif // MLTIMER_H

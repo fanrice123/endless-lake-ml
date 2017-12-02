@@ -12,7 +12,7 @@
 
 	
 MlScreenCapturer::MlScreenCapturer(MlDisplay& display)
-	: display(display), positions{std::make_tuple(0, 0), std::make_tuple(0, 0)}
+	: display(display), size_captured(false)
 {
 	// checking if directory exists
 	// if not, create one.
@@ -20,36 +20,45 @@ MlScreenCapturer::MlScreenCapturer(MlDisplay& display)
 	stat(save_dir.c_str(), &stat_buff);
 	if (!S_ISDIR(stat_buff.st_mode)) {
 		mkdir(save_dir.c_str(), 0777);
+		mkdir((save_dir + "/positive").c_str(), 0777);
+		mkdir((save_dir + "/negative").c_str(), 0777);
 	}
 	auto screen = ScreenOfDisplay(display.display_ptr.get(), 0);
-	positions[1] = std::make_tuple(screen->width, screen->height);
+	positions[1] = { screen->width, screen->height };
 }
 
 
 
-ScreenshotArea MlScreenCapturer::get_screen_coordinate() const
+ScreenArea MlScreenCapturer::get_screen_coordinate() const
 {
 	return {positions[0], positions[1]};
 }
 
-void MlScreenCapturer::screenshot()
+cv::Mat MlScreenCapturer::screenshot()
 {
+    /*
 	if (!size_captured) {
 		throw std::logic_error("never call MlScreenCapturer::capture_screen_size() before calling MlScreenCapturer::screenshot()!");
 	}	
-	int scr_width = std::get<Coord::X>(positions[1]) - std::get<Coord::X>(positions[0]);
-	int scr_height = std::get<Coord::Y>(positions[1]) - std::get<Coord::Y>(positions[0]);
+    */
+	int scr_width = positions[1].x - positions[0].x;
+	int scr_height = positions[1].y - positions[0].y;
 
 	// Get screenshot
 	auto img = XGetImage(display.display_ptr.get(),
 				display.window,
-				std::get<Coord::X>(positions[0]),
-				std::get<Coord::Y>(positions[0]),
+				positions[0].x,
+				positions[0].y,
 				scr_width,
 				scr_height,
 				AllPlanes,
 				ZPixmap);
 
+	return cv::Mat(scr_height,
+			       scr_width,
+			       CV_8UC4,
+			       img->data);
+    /*
 	auto pixels = cv::Mat(scr_height,
 			      scr_width,
 			      CV_8UC4,
@@ -60,6 +69,7 @@ void MlScreenCapturer::screenshot()
 	} catch (std::runtime_error& ex) {
 		std::cerr << ex.what() << std::endl;
 	}
+    */
 }
 
 const std::string MlScreenCapturer::save_dir = "data";

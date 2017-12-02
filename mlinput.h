@@ -3,6 +3,7 @@
 #include <chrono>
 #include <tuple>
 #include <atomic>
+#include <opencv2/opencv.hpp>
 #include <X11/Xlib.h>
 #include "mldisplay.h"
 #include "mltimer.h"
@@ -67,6 +68,11 @@ public:
 	 */
 	bool wait_press(const char);
 
+    /**
+     * waits mouse click even process is inactive.
+     */
+    bool global_wait_click(const MouseClick, const std::chrono::milliseconds&);
+
 	/**
 	 * this function is used for reseting time limit of waiting a 
 	 * key/button being press by calling function wait_press.
@@ -93,7 +99,6 @@ public:
 	 */
 	Position get_prev_position();
 
-	void listen_for(const std::chrono::milliseconds&, MouseClick, const char = 0);
 private:
 	// private member function
 	
@@ -122,6 +127,8 @@ private:
 	MlDisplay display;
 	MlTimer<std::chrono::milliseconds> timer;
 	bool clicked, pressed;
+    bool global_clicked;
+    int mice_fd;
 	
 	Position prev_pos;
 	
