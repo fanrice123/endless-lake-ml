@@ -32,9 +32,9 @@ public:
 	MlScreenCapturer(MlDisplay&);
 	
 	/**
-	 * Copy Constructor is disabled.
+	 * Copy Constructor is enabled.
 	 */
-	MlScreenCapturer(const MlScreenCapturer&) = delete;
+	MlScreenCapturer(const MlScreenCapturer&) = default;
 
 	// public member functions
 	
@@ -69,8 +69,11 @@ public:
 	 */
 	static const std::string save_dir;
 private:
+    // private member functions
+    
+
 	// private data variables
-	MlDisplay display;
+	MlDisplay& display;
 	Position positions[2];
 	bool size_captured;
 };
