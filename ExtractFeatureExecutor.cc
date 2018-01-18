@@ -3,25 +3,54 @@
 #include <atomic>
 #include <vector>
 #include <future>
+#include <utility>
 
 
 ExtractFeatureExecutor::ExtractFeatureExecutor(const cv::Rect& cropper)
-    : stop(false), status(ExecStat::EMPTY), local_thread([this, &cropper] {
+    : stop(false), status(ExecStat::EMPTY), local_thread([&] {
         while (!stop.load(std::memory_order_acquire)) {
+            cv.wait(buffer_m, [&status] { 
+                return status.load(std::memory_order_acquire) == ExecStat::READY;
+            });
+            status.store(ExecStat::ONGOING, std::memory_order_release);
+            task(cropper);
+            status.store(ExecStat::EMPTY, std::memory_order_release);
+        }
+            
+{
+}
+
+ExtractFeatureExecutor::~ExtractFeatureExecutor()
+{
+    stop.store(true, std::memory_order_release);
+    local_thread.join();
+}
+
+ExecStat ExtractFeatureExecuter::get_status() noexcept
+{
+    return status.load(std::memory_order_acquire);
+}
+
+std::future<std::vector<contour_type>> 
+ExtractFeatureExecuter::operator()(const cv::Mat& img)
+{
+
+    if (stop.load(std::memory_order_acquire))
+        throw std::logic_error("ExtractFeatureExecuter is suspended but being invoked.");
+    if (status.load(std::memory_order_acquire) != ExecStat::EMPTY)
+        throw std::logic_error("buffer of ExtractFeatureExecuter is not empty but being revised.");
+
+    decltype(task) new_task([&](const cv::Rect& cropper) {
+
             cv::Mat resized_img;
             cv::Mat target_img;
             cv::Mat coin_img, path_img, player_img;
             cv::Mat pathway_img;
             std::vector<contour_type> contours;
 
-            cv.wait(buffer_m, [&status] { 
-                return status.load(std::memory_order_acquire) == ExecStat::READY;
-            });
-
-            status.store(ExecStat::ONGOING, std::memory_order_release);
-
+            
             // crop image
-            cv::Mat roi = buffer(cropper);
+            cv::Mat roi = img(cropper);
 
             // resize image
             constexpr int roi_w = 480, roi_h = 840;
@@ -32,7 +61,7 @@ ExtractFeatureExecutor::ExtractFeatureExecutor(const cv::Rect& cropper)
             constexpr int box_area = box_w * box_h;
             constexpr int num_box_in_roi = roi_area / box_area;
             constexpr int threshold = static_cast<int>(box_w * box_h * threshold_perc);
-            std::vector<region_t_> features(threshold, region_t_::WATER);
+            std::vector<region_type> features(threshold, region_t_::WATER);
 
             cv::resize(roi, resized_img, cv::Size(roi_w, roi_h), 0, 0, CV_INTER_LINEAR);
             cv::Mat kernel = cv::Mat::ones(5, 5, CV_8UC4);
@@ -41,7 +70,6 @@ ExtractFeatureExecutor::ExtractFeatureExecutor(const cv::Rect& cropper)
             auto& map_coin = settings["coin"];
             auto& map_path = settings["path"];
             auto& map_player = settings["player"];
-
 
             cv::inRange(target_img, map_coin["min"], map_coin["max"], coin_img);
             cv::inRange(target_img, map_path["min"], map_path["max"], path_img);
@@ -64,35 +92,18 @@ ExtractFeatureExecutor::ExtractFeatureExecutor(const cv::Rect& cropper)
                 }
             }
 
-            status.store(ExecStat::EMPTY, std::memory_order_release);
         
             // hopefully NRVO applies here
             return features;
-        }
 
-{
-}
+    });
 
-ExtractFeatureExecutor::~ExtractFeatureExecutor()
-{
-    stop.store(true, std::memory_order_release);
-    local_thread.join();
-}
+    task = std::move(new_task);
 
-ExecStat ExtractFeatureExecuter::get_status() noexcept
-{
-    return status.load(std::memory_order_acquire);
-}
 
-std::future<std::vector<contour_type>> 
-ExtractFeatureExecuter::operator()(const cv::Mat& img)
-{
-    if (stop.load(std::memory_order_acquire))
-        throw std::logic_error("ExtractFeatureExecuter is suspended but being invoked.");
-    if (status.load(std::memory_order_acquire) != ExecStat::EMPTY)
-        throw std::logic_error("buffer of ExtractFeatureExecuter is not empty but being revised.");
-
-    buffer = img;
+    status.store(ExecStat::READY, std::memory_order_release);
     cv.post();
+
+    return task.get_future();
 }
 

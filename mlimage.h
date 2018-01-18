@@ -20,8 +20,8 @@ public:
     MlImageProcessor(const std::string&);
 
     void set_roi(const cv::Mat&);
-    std::vector<contour_type> extract_feature(const cv::Mat&);
-    std::future<std::vector<contour_type>> extract_feature_async(const cv::Mat&);
+    std::vector<region_type> extract_feature(const cv::Mat&);
+    std::future<std::vector<region_type>> extract_feature_async(const cv::Mat&);
 private:
     void load_settings(const std::string&);
 
