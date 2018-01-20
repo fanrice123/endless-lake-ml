@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <iterator>
 #include <chrono>
 #include <vector>
@@ -13,7 +14,7 @@
 using namespace std;
 //using namespace std::literals::chrono_literals;
 
-void write_data(ostream_iterator<exec_status>&, 
+void write_data(ostream_iterator<unsigned>&, 
                 ostream_iterator<bool>&, 
                 const vector<region_type>&,
                 bool);
@@ -25,7 +26,7 @@ volatile sig_atomic_t quit = 0;
 int main()
 {
     ofstream data_file("data.csv");
-    ostream_iterator<exec_status> d_writer(data_file, ", ");
+    ostream_iterator<unsigned> d_writer(data_file, ", ");
     ostream_iterator<bool> l_writer(data_file, "\n");
     thread_pool<3> pool;
     struct sigaction sa;
@@ -75,14 +76,12 @@ int main()
        	try {
             bool click = input.global_wait_click(input.LEFT_CLICK, timer.remaining());
             write_data(d_writer, l_writer, result_future.get(), click);
-            }
 
 	    } catch (std::runtime_error& ex) {
 		    std::cerr << ex.what() << std::endl;
 	    } 
         cerr << "noted" << endl;
 	}
-	cout << clicks.size() << endl;
 
 	return 0;
 }
@@ -93,11 +92,13 @@ void signal_handle(int sig)
         quit = 1;
 }
 
-void write_data(ostream_iterator<exec_status>& data_writer, 
+void write_data(ostream_iterator<unsigned>& data_writer, 
                 ostream_iterator<bool>& label_writer, 
                 const vector<region_type>& data,
                 bool label)
 {
-    copy(data.cbegin(), data.cend(), data_writer);
+    for (const auto& region : data) {
+        *data_writer = static_cast<unsigned>(region);
+    }
     *label_writer = label;
 }
