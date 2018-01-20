@@ -13,7 +13,7 @@
 using namespace std;
 //using namespace std::literals::chrono_literals;
 
-void write_data(ostream_iterator<ExecStat>&, 
+void write_data(ostream_iterator<exec_status>&, 
                 ostream_iterator<bool>&, 
                 const vector<region_type>&,
                 bool);
@@ -25,7 +25,7 @@ volatile sig_atomic_t quit = 0;
 int main()
 {
     ofstream data_file("data.csv");
-    ostream_iterator<ExecStat> d_writer(data_file, ", ");
+    ostream_iterator<exec_status> d_writer(data_file, ", ");
     ostream_iterator<bool> l_writer(data_file, "\n");
     thread_pool<3> pool;
     struct sigaction sa;
@@ -45,6 +45,7 @@ int main()
 
 	MlInputListener input(display);
 	MlScreenCapturer screen(display);
+    MlImageProcessor img_proc("settings.json");
     //screen.size_captured = true;
 	
 
@@ -74,11 +75,6 @@ int main()
        	try {
             bool click = input.global_wait_click(input.LEFT_CLICK, timer.remaining());
             write_data(d_writer, l_writer, result_future.get(), click);
-
-            if (clicks.back() = input.global_wait_click(input.LEFT_CLICK, timer.remaining())) {
-		        cv::imwrite(MlScreenCapturer::save_dir + "/positive/" + std::to_string(MlTimer<std::chrono::milliseconds>::get_timestamp()) + ".jpg", pic);
-            } else {
-		        cv::imwrite(MlScreenCapturer::save_dir + "/negative/" + std::to_string(MlTimer<std::chrono::milliseconds>::get_timestamp()) + ".jpg", pic);
             }
 
 	    } catch (std::runtime_error& ex) {
@@ -97,7 +93,7 @@ void signal_handle(int sig)
         quit = 1;
 }
 
-void write_data(ostream_iterator<ExecStat>& data_writer, 
+void write_data(ostream_iterator<exec_status>& data_writer, 
                 ostream_iterator<bool>& label_writer, 
                 const vector<region_type>& data,
                 bool label)

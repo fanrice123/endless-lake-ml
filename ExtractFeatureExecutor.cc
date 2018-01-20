@@ -5,42 +5,58 @@
 #include <future>
 #include <utility>
 
+ExtractFeatureExecutor::ExtractFeatureExecutor()
+    : stop(true), status(exec_status::EMPTY)
+{}
 
-ExtractFeatureExecutor::ExtractFeatureExecutor(const cv::Rect& cropper)
-    : stop(false), status(ExecStat::EMPTY), local_thread([&] {
-        while (!stop.load(std::memory_order_acquire)) {
-            cv.wait(buffer_m, [&status] { 
-                return status.load(std::memory_order_acquire) == ExecStat::READY;
-            });
-            status.store(ExecStat::ONGOING, std::memory_order_release);
-            task(cropper);
-            status.store(ExecStat::EMPTY, std::memory_order_release);
-        }
-            
+void ExtractFeatureExecutor::start(const cv::Rect& cropper, settings_type& settings)
 {
+    stop.store(false, std::memory_order_release);
+    status.store(exec_status::EMPTY, std::memory_order_release);
+    local_thread = std::move(std::thread{[&, cropper] {
+        std::unique_lock<std::mutex> lck{buffer_m};
+        while (!stop.load(std::memory_order_acquire)) {
+            cv.wait(lck, [&] { 
+                return status.load(std::memory_order_acquire) == exec_status::READY;
+            });
+            if (stop.load(std::memory_order_acquire))
+                break;
+            status.store(exec_status::ONGOING, std::memory_order_release);
+            task(cropper, settings);
+            status.store(exec_status::EMPTY, std::memory_order_release);
+        }
+    }});
+            
+}
+
+void ExtractFeatureExecutor::end()
+{
+    stop.store(true, std::memory_order_release);
+    cv.notify_one();
+    if (local_thread.joinable())
+        local_thread.join();
 }
 
 ExtractFeatureExecutor::~ExtractFeatureExecutor()
 {
-    stop.store(true, std::memory_order_release);
-    local_thread.join();
+    end();
 }
 
-ExecStat ExtractFeatureExecuter::get_status() noexcept
+exec_status ExtractFeatureExecutor::get_status() noexcept
 {
     return status.load(std::memory_order_acquire);
 }
 
-std::future<std::vector<contour_type>> 
-ExtractFeatureExecuter::operator()(const cv::Mat& img)
+std::future<std::vector<region_type>> 
+ExtractFeatureExecutor::operator()(const cv::Mat& img)
 {
 
     if (stop.load(std::memory_order_acquire))
         throw std::logic_error("ExtractFeatureExecuter is suspended but being invoked.");
-    if (status.load(std::memory_order_acquire) != ExecStat::EMPTY)
+    if (status.load(std::memory_order_acquire) != exec_status::EMPTY)
         throw std::logic_error("buffer of ExtractFeatureExecuter is not empty but being revised.");
 
-    decltype(task) new_task([&](const cv::Rect& cropper) {
+    decltype(task) new_task([&](const cv::Rect& cropper, settings_type& settings) {
 
             cv::Mat resized_img;
             cv::Mat target_img;
@@ -61,12 +77,12 @@ ExtractFeatureExecuter::operator()(const cv::Mat& img)
             constexpr int box_area = box_w * box_h;
             constexpr int num_box_in_roi = roi_area / box_area;
             constexpr int threshold = static_cast<int>(box_w * box_h * threshold_perc);
-            std::vector<region_type> features(threshold, region_t_::WATER);
+            std::vector<region_type> features(threshold, region_type::WATER);
 
             cv::resize(roi, resized_img, cv::Size(roi_w, roi_h), 0, 0, CV_INTER_LINEAR);
             cv::Mat kernel = cv::Mat::ones(5, 5, CV_8UC4);
 
-            cv::morphologyEx(resized_img, target_img, MORPH_OPEN, kernel);
+            cv::morphologyEx(resized_img, target_img, cv::MORPH_OPEN, kernel);
             auto& map_coin = settings["coin"];
             auto& map_path = settings["path"];
             auto& map_player = settings["player"];
@@ -79,7 +95,7 @@ ExtractFeatureExecuter::operator()(const cv::Mat& img)
             std::size_t index = 0;
             for (int i = 0; i != pathway_img.cols; i += box_w) {
                 for (int j = 0; j != pathway_img.rows; j += box_h) {
-                    cv::Rect sub_roi_cropper(i, j, bow_w, box_h);
+                    cv::Rect sub_roi_cropper(i, j, box_w, box_h);
                     cv::Mat sub_roi = pathway_img(sub_roi_cropper);
                     cv::Mat sub_roi_player = player_img(sub_roi_cropper);
         
@@ -101,8 +117,8 @@ ExtractFeatureExecuter::operator()(const cv::Mat& img)
     task = std::move(new_task);
 
 
-    status.store(ExecStat::READY, std::memory_order_release);
-    cv.post();
+    status.store(exec_status::READY, std::memory_order_release);
+    cv.notify_one();
 
     return task.get_future();
 }
