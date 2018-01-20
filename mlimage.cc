@@ -35,6 +35,7 @@ void MlImageProcessor::set_roi(const cv::Mat& img)
     }
 
     cropper = cv::boundingRect(*largest_contour_area);
+    do_extract_feature.start(cv::boundingRect(*largest_contour_area, settings));
 
 }
 
