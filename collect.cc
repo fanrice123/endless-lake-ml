@@ -10,7 +10,6 @@
 #include "mltimer.h"
 #include "mlinput.h"
 #include "mlimage.h"
-#include "thread_pool.h"
 using namespace std;
 //using namespace std::literals::chrono_literals;
 
@@ -28,7 +27,6 @@ int main()
     ofstream data_file("data.csv");
     ostream_iterator<unsigned> d_writer(data_file, ", ");
     ostream_iterator<bool> l_writer(data_file, "\n");
-    thread_pool<3> pool;
     struct sigaction sa;
     sa.sa_handler = signal_handle;
     sa.sa_flags = 0;
@@ -39,14 +37,18 @@ int main()
         return EXIT_FAILURE;
     }
 
+    cout << "pass" << endl;
 
 	XInitThreads();
 	MlDisplay display;
 	MlTimer<std::chrono::milliseconds> timer(30ms);
 
 	MlInputListener input(display);
+    cout << "pass" << endl;
 	MlScreenCapturer screen(display);
+    cout << "pass" << endl;
     MlImageProcessor img_proc("settings.json");
+    cout << "pass" << endl;
     //screen.size_captured = true;
 	
 

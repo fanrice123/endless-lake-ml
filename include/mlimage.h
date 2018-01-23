@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <future>
 #include <thread>
-#include "./feature/ExtractFeatureExecutor.h"
+#include "feature/ExtractFeatureExecutor.h"
 
 class MlImageProcessor {
 public:

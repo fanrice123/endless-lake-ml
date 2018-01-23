@@ -119,6 +119,9 @@ bool MlInputListener::global_wait_click(const MouseClick mouse_click, const std:
                 case RIGHT_CLICK:
                     global_clicked = MS_RIGHT(data[0]);
                     break;
+                default:
+                    // do nothing
+                    break;
                 }
             //} else if (count < 0 && errno == EAGAIN) {
 
