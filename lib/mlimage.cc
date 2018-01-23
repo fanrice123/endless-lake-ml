@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <future>
 #include <condition_variable>
+#include "./feature/ExtractFeatureExecutor.h"
 
 MlImageProcessor::MlImageProcessor(const std::string& setting_path)
 {
