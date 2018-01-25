@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10.1)
 # set language standard
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # project name
 project(endless_lake_ml CXX)

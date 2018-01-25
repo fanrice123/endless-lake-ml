@@ -40,12 +40,12 @@ void MlImageProcessor::set_roi(const cv::Mat& img)
 
 }
 
-std::vector<region_type> MlImageProcessor::extract_feature(const cv::Mat& img)
+std::vector<float> MlImageProcessor::extract_feature(const cv::Mat& img)
 {
     return extract_feature_async(img).get();
 }
 
-std::future<std::vector<region_type>> 
+std::future<std::vector<float>> 
 MlImageProcessor::extract_feature_async(const cv::Mat& img)
 {
     return (*do_extract_feature)(img);

@@ -47,7 +47,7 @@ exec_status ExtractFeatureExecutor::get_status() noexcept
     return status.load(std::memory_order_acquire);
 }
 
-std::future<std::vector<region_type>> 
+std::future<std::vector<float>> 
 ExtractFeatureExecutor::operator()(const cv::Mat& img)
 {
 
@@ -77,7 +77,7 @@ ExtractFeatureExecutor::operator()(const cv::Mat& img)
             constexpr int box_area = box_w * box_h;
             constexpr int num_box_in_roi = roi_area / box_area;
             constexpr int threshold = static_cast<int>(box_w * box_h * threshold_perc);
-            std::vector<region_type> features(threshold, region_type::WATER);
+            std::vector<float> features(num_box_in_roi * 2, 0.0f);
 
             cv::resize(roi, resized_img, cv::Size(roi_w, roi_h), 0, 0, CV_INTER_LINEAR);
             cv::Mat kernel = cv::Mat::ones(5, 5, CV_8UC4);
@@ -93,17 +93,34 @@ ExtractFeatureExecutor::operator()(const cv::Mat& img)
             cv::inRange(target_img, map_player["min"], map_path["max"], player_img);
         
             std::size_t index = 0;
+            // extract feature of pathway
             for (int i = 0; i != pathway_img.cols; i += box_w) {
                 for (int j = 0; j != pathway_img.rows; j += box_h) {
                     cv::Rect sub_roi_cropper(i, j, box_w, box_h);
                     cv::Mat sub_roi = pathway_img(sub_roi_cropper);
-                    cv::Mat sub_roi_player = player_img(sub_roi_cropper);
         
+                    /*
                     if (cv::countNonZero(sub_roi) > threshold)
                         features[index] = region_type::PATH;
+                    */
+                    features[index] = cv::countNonZero(sub_roi);
         
-                    if (cv::countNonZero(sub_roi_player) > threshold)
+                    ++index;
+                }
+            }
+
+            // extract feature of player
+            for (int i = 0; i != player_img.cols; i += box_w) {
+                for (int j = 0; j != player_img.rows; j += box_h) {
+                    cv::Rect sub_roi_cropper(i, j, box_w, box_h);
+                    cv::Mat sub_roi = player_img(sub_roi_cropper);
+        
+                    /*
+                    if (cv::countNonZero(sub_roi) > threshold)
                         features[index] = region_type::PLAYER;
+                    */
+                    features[index] = cv::countNonZero(sub_roi);
+        
                     ++index;
                 }
             }

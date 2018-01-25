@@ -13,10 +13,14 @@
 using namespace std;
 //using namespace std::literals::chrono_literals;
 
-void write_data(ostream_iterator<unsigned>&, 
-                ostream_iterator<bool>&, 
-                const vector<region_type>&,
-                bool);
+template <typename Data_F_Itr,
+          typename Data_Label_F_Itr,
+          typename Data_Con,
+          typename Label>
+void write_data(Data_F_Itr&, 
+                Data_Label_F_Itr&, 
+                Data_Con&&,
+                Label&&);
 
 void signal_handle(int);
 
@@ -24,9 +28,11 @@ volatile sig_atomic_t quit = 0;
 
 int main()
 {
-    ofstream data_file("data.csv");
-    ostream_iterator<unsigned> d_writer(data_file, ", ");
-    ostream_iterator<bool> l_writer(data_file, "\n");
+    ofstream data_file("data.csv", ios::app | ios::out);
+    ofstream data_label_file("data_label.csv", ios::app | ios::out);
+    data_label_file << fixed;
+    ostream_iterator<string> d_writer(data_file, "\n");
+    ostream_iterator<bool> l_writer(data_label_file, "\n");
     struct sigaction sa;
     sa.sa_handler = signal_handle;
     sa.sa_flags = 0;
@@ -94,13 +100,25 @@ void signal_handle(int sig)
         quit = 1;
 }
 
-void write_data(ostream_iterator<unsigned>& data_writer, 
-                ostream_iterator<bool>& label_writer, 
-                const vector<region_type>& data,
-                bool label)
+template <typename Data_F_Itr,
+          typename Data_Label_F_Itr,
+          typename Data_Con,
+          typename Label>
+void write_data(Data_F_Itr& data_writer, 
+                Data_Label_F_Itr& label_writer, 
+                Data_Con&& data,
+                Label&& label)
 {
+    ostringstream data_line;
+    bool not_first_write = false;
     for (const auto& region : data) {
-        *data_writer = static_cast<unsigned>(region);
+        if (not_first_write) {
+            data_line << ',';
+        } else {
+            not_first_write = true;
+        }
+        data_line << fixed << region; // display all floating point
     }
+    *data_writer = data_line.str();
     *label_writer = label;
 }

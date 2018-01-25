@@ -8,7 +8,6 @@
 #include <memory>
 #include <condition_variable>
 
-enum class region_type : std::int8_t { WATER, PATH, PLAYER };
 enum class exec_status : std::int8_t { EMPTY, READY, ONGOING };
 
 class ExtractFeatureExecutor {
@@ -24,10 +23,10 @@ public:
     void start(const cv::Rect&, settings_type&);
     void end();
 
-    std::future<std::vector<region_type>> operator()(const cv::Mat&);
+    std::future<std::vector<float>> operator()(const cv::Mat&);
 
 private:
-    std::packaged_task<std::vector<region_type>(const cv::Rect&, settings_type&)> task;
+    std::packaged_task<std::vector<float>(const cv::Rect&, settings_type&)> task;
     std::atomic<exec_status> status;
     std::atomic_bool stop;
     std::condition_variable cv;
