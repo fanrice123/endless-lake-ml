@@ -1,7 +1,6 @@
 #ifndef MLDATA_H
 #define MLDATA_H
 #include <iostream>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <tuple>
@@ -28,6 +27,19 @@ std::tuple<std::decay_t<XType>,
            std::decay_t<XType>, 
            std::decay_t<YType>>
 cv_split(XType&& X, YType&& Y, double percent);
+
+template <typename XType,
+          typename YType, 
+          typename XTypeRaw = std::decay_t<XType>, 
+          typename YTypeRaw = std::decay_t<YType>>
+std::tuple<XTypeRaw, YTypeRaw> 
+stripe_extra(XType&&, YType&&, typename YTypeRaw::value_type, double);
+
+template <typename XType,
+          typename YType,
+          typename XTypeRaw = std::decay_t<XType>,
+          typename YTypeRaw = std::decay_t<YType>>
+std::tuple<XTypeRaw, YTypeRaw> balance_dataset(XType&&, YType&&);
 
 template <template <typename> typename XType=std::vector,
           template <typename> typename XLineType=std::vector,
@@ -104,6 +116,72 @@ cv_split(XType&& X, YType&& Y, double percent) {
     }
 
     return std::make_tuple(train_X, train_Y, cv_X, cv_Y);
+}
+
+template <typename XType, 
+          typename YType,
+          typename XTypeRaw = std::decay_t<XType>, 
+          typename YTypeRaw = std::decay_t<YType>>
+std::tuple<XTypeRaw, YTypeRaw>
+stripe_extra(XType&& X, YType&& Y, typename YTypeRaw::value_type label, double percent)
+{
+    XTypeRaw new_X;
+    YTypeRaw new_Y;
+
+    auto n = Y.size();
+    auto new_n = n * percent;
+
+    dataset_shuffle(X, Y);
+
+    std::size_t i = 0, c = 0;
+    while (c != new_n) {
+        if (Y[i] == label)
+            ++c;
+        new_X.push_back(std::move(X[i]));
+        new_Y.push_back(std::move(Y[i]));
+        ++i;
+    }
+    while (i != n) {
+        if (Y[i] != label) {
+            new_X.push_back(std::move(X[i]));
+            new_Y.push_back(std::move(Y[i]));
+        }
+        ++i;
+    }
+
+    return std::tuple<XType, YType>(new_X, new_Y);
+}
+
+template <typename XType,
+          typename YType, 
+          typename XTypeRaw = std::decay_t<XType>,
+          typename YTypeRaw = std::decay_t<YType>>
+std::tuple<XTypeRaw, YTypeRaw> balance_dataset(XType&& X, YType&& Y)
+{
+    auto n = Y.size();
+    auto pos_n = std::count_if(Y.cbegin(), Y.cend(), [] (const auto& y) { return y == 1; });
+    decltype(pos_n) neg_n = Y.size() - pos_n;
+
+    double pos_n_d = static_cast<double>(pos_n);
+    double neg_n_d = static_cast<double>(neg_n);
+
+    if (pos_n == 0 || neg_n == 0)
+        goto no_stripe;
+
+    if (pos_n_d / n > 0.75)
+        goto stripe_pos;
+    else if (neg_n_d / n > 0.75)
+        goto stripe_neg;
+    else
+        goto no_stripe;
+
+stripe_pos:
+    return stripe_extra(X, Y, 1, 0.7);
+stripe_neg:
+    return stripe_extra(X, Y, 0, 0.7);
+no_stripe:
+    return std::tuple<XType, YType>(std::forward<XType>(X), std::forward<YType>(Y));
+
 }
 
 #endif // MLDATA_H

@@ -31,12 +31,15 @@ find_package(Eigen3 REQUIRED)
 find_package(GFlags REQUIRED)
 # find caffe2
 find_package(Caffe2 REQUIRED)
+# find glog
+#find_package(Glog REQUIRED)
 
 
 include_directories(${X11_INCLUDE_DIR})
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
+include_directories(/usr/include/glog)
 
 add_subdirectory(${LIB_DIR})
 add_executable(collect src/collect.cc)
@@ -53,7 +56,9 @@ target_link_libraries(train ${X11_LIBRARIES})
 target_link_libraries(train ${ATOMIC_LIBRARY})
 target_link_libraries(train ml)
 target_link_libraries(train ${GFLAGS_LIBRARY})
+target_link_libraries(train glog)
 target_link_libraries(train ${CAFFE2_LIBRARY})
+target_link_libraries(train ${PROTOBUF_LIBRARY})
 
 #target_link_libraries(train Eigen)
 

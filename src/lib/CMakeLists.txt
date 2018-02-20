@@ -9,6 +9,7 @@ add_library(ml STATIC mlimage.cc
                       mldisplay.cc 
                       mlinput.cc 
                       mlscrcap.cc
+                      mlnet.cc
 )
 
 target_link_libraries(ml ml-feature)
