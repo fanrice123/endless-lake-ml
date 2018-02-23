@@ -15,7 +15,6 @@ public:
     typedef std::vector<cv::Point> contour_type;
 
     MlImageProcessor(const std::string&);
-    ~MlImageProcessor() { std::cout << "dstructor called." << std::endl; }
 
     void set_roi(const cv::Mat&);
     std::vector<float> extract_feature(const cv::Mat&);
