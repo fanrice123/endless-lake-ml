@@ -14,15 +14,6 @@
 MlScreenCapturer::MlScreenCapturer(MlDisplay& display)
 	: display(display), size_captured(false)
 {
-	// checking if directory exists
-	// if not, create one.
-	struct stat stat_buff;
-	stat(save_dir.c_str(), &stat_buff);
-	if (!S_ISDIR(stat_buff.st_mode)) {
-		mkdir(save_dir.c_str(), 0777);
-		mkdir((save_dir + "/positive").c_str(), 0777);
-		mkdir((save_dir + "/negative").c_str(), 0777);
-	}
 	auto screen = ScreenOfDisplay(display.display_ptr.get(), 0);
 	positions[1] = { screen->width, screen->height };
 }
@@ -72,4 +63,3 @@ cv::Mat MlScreenCapturer::screenshot()
     */
 }
 
-const std::string MlScreenCapturer::save_dir = "data";

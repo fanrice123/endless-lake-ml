@@ -7,7 +7,6 @@
 #include <atomic>
 #include <memory>
 #include <condition_variable>
-#include <iostream>
 
 enum class exec_status : std::int8_t { EMPTY, READY, ONGOING };
 
@@ -50,8 +49,6 @@ std::future<std::vector<float>>  ExtractFeatureExecutor::operator()(const cv::Ma
         throw std::logic_error("ExtractFeatureExecuter is suspended but being invoked.");
     if (status.load(std::memory_order_acquire) != exec_status::EMPTY)
         throw std::logic_error("buffer of ExtractFeatureExecuter is not empty but being revised.");
-
-    using namespace std;
 
     decltype(task) new_task([&](const cv::Rect& cropper, settings_type& settings) {
 
