@@ -7,6 +7,7 @@
 #include <future>
 #include <thread>
 #include "feature/ExtractFeatureExecutor.h"
+#include <iostream>
 
 class MlImageProcessor {
 public:
@@ -14,6 +15,7 @@ public:
     typedef std::vector<cv::Point> contour_type;
 
     MlImageProcessor(const std::string&);
+    ~MlImageProcessor() { std::cout << "dstructor called." << std::endl; }
 
     void set_roi(const cv::Mat&);
     std::vector<float> extract_feature(const cv::Mat&);
@@ -22,7 +24,7 @@ private:
     void load_settings(const std::string&);
 
     settings_type settings;
-    std::unique_ptr<ExtractFeatureExecutor> do_extract_feature;
+    ExtractFeatureExecutor do_extract_feature;
 };
 
 #endif

@@ -7,6 +7,7 @@
 #include <atomic>
 #include <memory>
 #include <condition_variable>
+#include <iostream>
 
 enum class exec_status : std::int8_t { EMPTY, READY, ONGOING };
 
@@ -50,6 +51,8 @@ std::future<std::vector<float>>  ExtractFeatureExecutor::operator()(const cv::Ma
     if (status.load(std::memory_order_acquire) != exec_status::EMPTY)
         throw std::logic_error("buffer of ExtractFeatureExecuter is not empty but being revised.");
 
+    using namespace std;
+
     decltype(task) new_task([&](const cv::Rect& cropper, settings_type& settings) {
 
             cv::Mat resized_img;
@@ -72,7 +75,8 @@ std::future<std::vector<float>>  ExtractFeatureExecutor::operator()(const cv::Ma
             std::vector<float> features(num_box_in_roi * 2, 0.0f);
 
             cv::resize(roi, resized_img, cv::Size(roi_w, roi_h), 0, 0, CV_INTER_LINEAR);
-            cv::Mat kernel = cv::Mat::ones(5, 5, CV_8UC4);
+            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                                                       cv::Size(5, 5));
 
             cv::morphologyEx(resized_img, target_img, cv::MORPH_OPEN, kernel);
             auto& map_coin = settings["coin"];
@@ -122,6 +126,11 @@ std::future<std::vector<float>>  ExtractFeatureExecutor::operator()(const cv::Ma
             return features;
 
     });
+    task = std::move(new_task);
+    status.store(exec_status::READY, std::memory_order_release);
+    cv.notify_one();
+    return task.get_future();
+
 }
 
 #endif

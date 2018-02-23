@@ -23,7 +23,7 @@ MlInputListener::MlInputListener(MlDisplay& display, const std::chrono::millisec
       mice_fd(open("/dev/input/mice", O_RDONLY | O_NONBLOCK))
 {
     if (mice_fd < 0)
-        throw new std::runtime_error("Open \"/dev/input/mice\" failed.");
+        throw std::runtime_error("Open \"/dev/input/mice\" failed.");
 
 }
 

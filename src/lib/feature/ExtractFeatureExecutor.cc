@@ -11,13 +11,16 @@ ExtractFeatureExecutor::ExtractFeatureExecutor()
 
 void ExtractFeatureExecutor::start(const cv::Rect& cropper, settings_type& settings)
 {
+
     stop.store(false, std::memory_order_release);
     status.store(exec_status::EMPTY, std::memory_order_release);
-    local_thread = std::move(std::thread{[&, cropper] {
+    
+    local_thread = std::thread([&, cropper] {
         std::unique_lock<std::mutex> lck{buffer_m};
         while (!stop.load(std::memory_order_acquire)) {
             cv.wait(lck, [&] { 
-                return status.load(std::memory_order_acquire) == exec_status::READY;
+                return status.load(std::memory_order_acquire) == exec_status::READY ||
+                       stop.load(std::memory_order_acquire);
             });
             if (stop.load(std::memory_order_acquire))
                 break;
@@ -25,7 +28,7 @@ void ExtractFeatureExecutor::start(const cv::Rect& cropper, settings_type& setti
             task(cropper, settings);
             status.store(exec_status::EMPTY, std::memory_order_release);
         }
-    }});
+    });
             
 }
 

@@ -60,6 +60,8 @@ target_link_libraries(train glog)
 target_link_libraries(train ${CAFFE2_LIBRARY})
 target_link_libraries(train ${PROTOBUF_LIBRARY})
 
+configure_file(${CMAKE_SOURCE_DIR}/src/setting.json 
+               ${CMAKE_CURRENT_BINARY_DIR}/setting.json COPYONLY)
 #target_link_libraries(train Eigen)
 
 #add_executable(train train.cc)

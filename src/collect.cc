@@ -28,8 +28,8 @@ volatile sig_atomic_t quit = 0;
 
 int main()
 {
-    ofstream data_file("data.csv", ios::app | ios::out);
-    ofstream data_label_file("data_label.csv", ios::app | ios::out);
+    ofstream data_file("data.csv", /*ios::app |*/ ios::out);
+    ofstream data_label_file("data_label.csv", /*ios::app |*/ ios::out);
     data_label_file << fixed;
     ostream_iterator<string> d_writer(data_file, "\n");
     ostream_iterator<bool> l_writer(data_label_file, "\n");
@@ -43,16 +43,13 @@ int main()
         return EXIT_FAILURE;
     }
 
-    cout << "pass" << endl;
 
 	XInitThreads();
 	MlDisplay display;
 	MlTimer<std::chrono::milliseconds> timer(30ms);
 
 	MlInputListener input(display);
-    cout << "pass" << endl;
 	MlScreenCapturer screen(display);
-    cout << "pass" << endl;
     MlImageProcessor img_proc("settings.json");
     cout << "pass" << endl;
     //screen.size_captured = true;
@@ -72,23 +69,21 @@ int main()
 	screen.capture_screen_size(get_click, get_pos);	
     img_proc.set_roi(screen.screenshot());
 
-	cout << 'x' << endl;
 	input.get_press('b');
 
 
-	cout << "fine" << endl;
 	while (!quit) { 
 		timer.start();
 		auto pic = screen.screenshot();
         auto result_future = img_proc.extract_feature_async(pic);
        	try {
             bool click = input.global_wait_click(input.LEFT_CLICK, timer.remaining());
-            write_data(d_writer, l_writer, result_future.get(), click);
+            auto r = result_future.get();
+            write_data(d_writer, l_writer, r, click);
 
 	    } catch (std::runtime_error& ex) {
 		    std::cerr << ex.what() << std::endl;
 	    } 
-        cerr << "noted" << endl;
 	}
 
 	return 0;
@@ -117,7 +112,7 @@ void write_data(Data_F_Itr& data_writer,
         } else {
             not_first_write = true;
         }
-        data_line << fixed << region; // display all floating point
+        data_line << region; // display all floating point
     }
     *data_writer = data_line.str();
     *label_writer = label;
