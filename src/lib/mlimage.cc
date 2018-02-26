@@ -77,12 +77,23 @@ void MlImageProcessor::load_settings(const std::string& setting_path)
 
             auto itr = subsetting.value.Begin();
             int r = itr->GetInt();
+            ++itr;
             int g = itr->GetInt();
+            ++itr;
             int b = itr->GetInt();
+            std::cout << r << ' ' << g << ' ' << b << std::endl;
 
             subsettings[subsetting_name] = cv::Scalar(b, g, r);
         }
         settings[setting.name.GetString()] = std::move(subsettings);
+    }
+    for (auto& p : settings) {
+        std::cout << p.first << std::endl;
+        for (auto& sub : p.second) {
+
+            std::cout << sub.first << ' ' << sub.second << std::endl;
+        }
+
     }
 }
 

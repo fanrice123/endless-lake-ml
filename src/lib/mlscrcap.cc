@@ -6,6 +6,7 @@
 #include <tuple>
 #include <opencv2/opencv.hpp> // must include opencv before X11 lib
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <sys/stat.h>
 #include "mldisplay.h"
 #include "mltimer.h"
@@ -36,19 +37,21 @@ cv::Mat MlScreenCapturer::screenshot()
 	int scr_height = positions[1].y - positions[0].y;
 
 	// Get screenshot
-	auto img = XGetImage(display.display_ptr.get(),
-				display.window,
-				positions[0].x,
-				positions[0].y,
-				scr_width,
-				scr_height,
-				AllPlanes,
-				ZPixmap);
+	auto scr_shot = XGetImage(display.display_ptr.get(),
+				    display.window,
+				    positions[0].x,
+				    positions[0].y,
+				    scr_width,
+				    scr_height,
+				    AllPlanes,
+				    ZPixmap);
 
-	return cv::Mat(scr_height,
-			       scr_width,
-			       CV_8UC4,
-			       img->data);
+	auto img = cv::Mat(scr_height,
+			           scr_width,
+			           CV_8UC4,
+			           scr_shot->data).clone();
+    XDestroyImage(scr_shot);
+    return img;
     /*
 	auto pixels = cv::Mat(scr_height,
 			      scr_width,

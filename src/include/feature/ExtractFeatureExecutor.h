@@ -71,19 +71,30 @@ std::future<std::vector<float>>  ExtractFeatureExecutor::operator()(const cv::Ma
             constexpr int threshold = static_cast<int>(box_w * box_h * threshold_perc);
             std::vector<float> features(num_box_in_roi * 2, 0.0f);
 
+            cv::cvtColor(roi, roi, cv::COLOR_BGRA2BGR);
             cv::resize(roi, resized_img, cv::Size(roi_w, roi_h), 0, 0, CV_INTER_LINEAR);
-            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-                                                       cv::Size(5, 5));
+            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT,
+                                                       cv::Size(2, 2));
 
-            cv::morphologyEx(resized_img, target_img, cv::MORPH_OPEN, kernel);
+            cv::medianBlur(resized_img, resized_img, 3);
+            cv::morphologyEx(resized_img, target_img, cv::MORPH_CLOSE, kernel);
+            cv::imshow("preview", target_img);
             auto& map_coin = settings["coin"];
             auto& map_path = settings["path"];
             auto& map_player = settings["player"];
 
+            //cv::inRange(target_img, cv::Scalar(0, 0, 0, 0), cv::Scalar(255, 255, 255, 255), coin_img);
             cv::inRange(target_img, map_coin["min"], map_coin["max"], coin_img);
+            //cv::inRange(target_img, cv::Scalar(0, 200, 200), cv::Scalar(100, 255, 255), coin_img);
+            //cv::imshow("coin", coin_img);
             cv::inRange(target_img, map_path["min"], map_path["max"], path_img);
-            cv::bitwise_and(coin_img, path_img, pathway_img);
-            cv::inRange(target_img, map_player["min"], map_path["max"], player_img);
+            cv::bitwise_or(coin_img, path_img, pathway_img);
+            cv::imshow("path", pathway_img);
+            cv::cvtColor(target_img, player_img, cv::COLOR_BGR2HSV);
+            cv::inRange(player_img, map_player["min"], map_player["max"], player_img);
+            //cv::inRange(player_img, cv::Scalar(0, 0, 0), cv::Scalar(255, 50, 255), player_img);
+            cv::imshow("player", player_img);
+            cv::waitKey(10);
         
             std::size_t index = 0;
             // extract feature of pathway

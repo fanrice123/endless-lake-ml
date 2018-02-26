@@ -13,12 +13,9 @@
 using namespace std;
 //using namespace std::literals::chrono_literals;
 
-template <typename Data_F_Itr,
-          typename Data_Label_F_Itr,
-          typename Data_Con,
-          typename Label>
-void write_data(Data_F_Itr&, 
-                Data_Label_F_Itr&, 
+template <typename Data_Con, typename Label>
+void write_data(ofstream&, 
+                ofstream&, 
                 Data_Con&&,
                 Label&&);
 
@@ -28,11 +25,9 @@ volatile sig_atomic_t quit = 0;
 
 int main()
 {
-    ofstream data_file("data.csv", /*ios::app |*/ ios::out);
-    ofstream data_label_file("data_label.csv", /*ios::app |*/ ios::out);
-    data_label_file << fixed;
-    ostream_iterator<string> d_writer(data_file, "\n");
-    ostream_iterator<bool> l_writer(data_label_file, "\n");
+    ofstream data_fs("data.csv", /*ios::app |*/ ios::out);
+    ofstream data_label_fs("data_label.csv", /*ios::app |*/ ios::out);
+    data_label_fs << fixed;
     struct sigaction sa;
     sa.sa_handler = signal_handle;
     sa.sa_flags = 0;
@@ -79,7 +74,7 @@ int main()
        	try {
             bool click = input.global_wait_click(input.LEFT_CLICK, timer.remaining());
             auto r = result_future.get();
-            write_data(d_writer, l_writer, r, click);
+            write_data(data_fs, data_label_fs, r, click);
 
 	    } catch (std::runtime_error& ex) {
 		    std::cerr << ex.what() << std::endl;
@@ -95,12 +90,9 @@ void signal_handle(int sig)
         quit = 1;
 }
 
-template <typename Data_F_Itr,
-          typename Data_Label_F_Itr,
-          typename Data_Con,
-          typename Label>
-void write_data(Data_F_Itr& data_writer, 
-                Data_Label_F_Itr& label_writer, 
+template<typename Data_Con, typename Label>
+void write_data(ofstream& data_writer, 
+                ofstream& label_writer, 
                 Data_Con&& data,
                 Label&& label)
 {
@@ -114,6 +106,6 @@ void write_data(Data_F_Itr& data_writer,
         }
         data_line << region; // display all floating point
     }
-    *data_writer = data_line.str();
-    *label_writer = label;
+    data_writer << data_line.str() << '\n';
+    label_writer << label << '\n';
 }
